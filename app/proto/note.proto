@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package note;
+
+service NoteService {
+  rpc CreateNote (CreateNoteRequest) returns (NoteResponse);
+  rpc GetNote (GetNoteRequest) returns (NoteResponse);
+  rpc ListNotes (ListNotesRequest) returns (ListNotesResponse);
+  rpc UpdateNote (UpdateNoteRequest) returns (NoteResponse);
+  rpc DeleteNote (DeleteNoteRequest) returns (DeleteNoteResponse);
+}
+
+message CreateNoteRequest {
+  string title = 1;
+  string content = 2;
+}
+
+message GetNoteRequest {
+  string entity_id = 1;
+}
+
+message ListNotesRequest {
+  int32 skip = 1;
+  int32 limit = 2;
+}
+
+message UpdateNoteRequest {
+  string entity_id = 1;
+  string title = 2;
+  string content = 3;
+}
+
+message DeleteNoteRequest {
+  string entity_id = 1;
+}
+
+message NoteResponse {
+  string id = 1;
+  string title = 2;
+  string content = 3;
+  string owner_id = 4;
+  string created_at = 5;
+  string updated_at = 6;
+}
+
+message ListNotesResponse {
+  repeated NoteResponse notes = 1;
+}
+
+message DeleteNoteResponse {}

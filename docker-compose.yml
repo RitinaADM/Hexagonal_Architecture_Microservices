@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000" # REST
+      - "50052:50051" # gRPC
+    environment:
+      - PYTHONIOENCODING=utf-8
+      - MONGO_URI=mongodb://mongo:27017
+      - MONGO_DB=task_service
+      - MONGO_UUID_REPRESENTATION=standard
+      - JWT_SECRET_KEY=your-secure-secret-key-with-at-least-32-characters
+      - GRPC_PORT=50051
+      - REDIS_URI=redis://redis:6379/0
+      - REDIS_TTL=3600
+      - MAX_DOCS_PER_USER=1
+      - REST_PORT=8000
+      - RABBITMQ_URI=amqp://guest:guest@rabbitmq:5672/
+      - RABBIT_EXCHANGE_NAME=events
+    depends_on:
+      - mongo
+      - redis
+      - rabbitmq
+    volumes:
+      - .:/app
+    networks:
+      - app-network
+
+  mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7.0
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    ports:
+      - "5672:5672"
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - app-network
+
+volumes:
+  mongo-data:
+  redis-data:
+  rabbitmq-data:
+
+networks:
+  app-network:
+    driver: bridge
