@@ -128,6 +128,14 @@ class AsyncNoteService(BaseService[
                 raise NotFoundError(self.entity_name, str(update_dto.id))
             response = self._to_response_dto(updated_entity)
             logger.info("Note updated successfully")
+
+            await self.publisher.publish("note.updated", {
+                "id": str(updated_entity.id),
+                "title": updated_entity.title,
+                "owner_id": str(updated_entity.owner_id),
+                "updated_at": updated_entity.updated_at.isoformat()
+            })
+
             return response
         except Exception as e:
             logger.exception(f"Failed to update Note", error=str(e))
@@ -146,6 +154,12 @@ class AsyncNoteService(BaseService[
                 raise AccessDeniedError(f"Access to this Note is denied")
             await self.repo.delete(delete_dto.id, request_id)
             logger.info("Note deleted successfully")
+
+            await self.publisher.publish("note.deleted", {
+                "id": str(delete_dto.id),
+                "owner_id": str(user_id)
+            })
+
             return True
         except Exception as e:
             logger.exception(f"Failed to delete Note", error=str(e))

@@ -1,24 +1,25 @@
 import grpc
-import uuid
 from typing import Tuple
-from uuid import UUID
+from uuid import UUID, uuid4
 from domain.exceptions.auth import AuthenticationError
 from domain.ports.outbound.security.auth_port import AuthPort
 from domain.ports.outbound.logger.logger_port import LoggerPort
 from application.services.note import AsyncNoteService
-from application.dto.note import NoteCreateDTO, NoteGetDTO, NoteListDTO, NoteUpdateDTO, NoteDeleteDTO, NoteResponseDTO, NoteListResponseDTO
 from infrastructure.adapters.inbound.grpc import note_pb2, note_pb2_grpc
+from infrastructure.adapters.inbound.grpc.dto.note import (
+    GrpcNoteCreateDTO, GrpcNoteGetDTO, GrpcNoteListDTO, GrpcNoteUpdateDTO,
+    GrpcNoteDeleteDTO, GrpcNoteResponseDTO, GrpcNoteListResponseDTO
+)
+from infrastructure.adapters.inbound.grpc.mappers import (
+    proto_to_grpc_create_dto, proto_to_grpc_get_dto, proto_to_grpc_list_dto,
+    proto_to_grpc_update_dto, proto_to_grpc_delete_dto,
+    grpc_to_service_create_dto, grpc_to_service_get_dto, grpc_to_service_list_dto,
+    grpc_to_service_update_dto, grpc_to_service_delete_dto,
+    service_to_grpc_response_dto, service_to_grpc_list_response_dto,
+    grpc_to_proto_response, grpc_to_proto_list_response
+)
 from infrastructure.adapters.inbound.grpc.utils import async_handle_grpc_exceptions, log_execution_time
 
-def map_to_note_response(note: NoteResponseDTO) -> note_pb2.NoteResponse:
-    return note_pb2.NoteResponse(
-        id=str(note.id),
-        title=note.title,
-        content=note.content,
-        owner_id=str(note.owner_id),
-        created_at=note.created_at.isoformat(),
-        updated_at=note.updated_at.isoformat()
-    )
 
 class NoteServiceServicer(note_pb2_grpc.NoteServiceServicer):
     def __init__(self, service: AsyncNoteService, logger: LoggerPort, auth: AuthPort):
@@ -38,7 +39,7 @@ class NoteServiceServicer(note_pb2_grpc.NoteServiceServicer):
 
         try:
             user_id, role = self.auth.verify_token(token)
-            request_id = metadata.get("request_id", str(uuid.uuid4()))
+            request_id = metadata.get("request_id", str(uuid4()))
             self.logger.debug(f"Token verified, user_id={user_id}, role={role}, request_id={request_id}")
             return user_id, role, request_id
         except AuthenticationError as e:
@@ -52,10 +53,11 @@ class NoteServiceServicer(note_pb2_grpc.NoteServiceServicer):
         logger = self.logger.bind(request_id=request_id, endpoint="CreateNote")
         logger.debug(f"Entering CreateNote with user_id={user_id}, role={role}")
 
-        dto = NoteCreateDTO(title=request.title, content=request.content)
-        result = await self.service.create(dto, user_id, role, request_id)
+        grpc_dto = proto_to_grpc_create_dto(request)
+        service_dto = grpc_to_service_create_dto(grpc_dto)
+        result = await self.service.create(service_dto, user_id, role, request_id)
         logger.info("Note created successfully")
-        return map_to_note_response(result)
+        return grpc_to_proto_response(service_to_grpc_response_dto(result))
 
     @async_handle_grpc_exceptions
     @log_execution_time
@@ -64,10 +66,11 @@ class NoteServiceServicer(note_pb2_grpc.NoteServiceServicer):
         logger = self.logger.bind(request_id=request_id, endpoint="GetNote")
         logger.debug(f"Entering GetNote with entity_id={request.entity_id}")
 
-        dto = NoteGetDTO(entity_id=UUID(request.entity_id))
-        result = await self.service.get(dto, user_id, role, request_id)
+        grpc_dto = proto_to_grpc_get_dto(request)
+        service_dto = grpc_to_service_get_dto(grpc_dto)
+        result = await self.service.get(service_dto, user_id, role, request_id)
         logger.info("Note retrieved successfully")
-        return map_to_note_response(result)
+        return grpc_to_proto_response(service_to_grpc_response_dto(result))
 
     @async_handle_grpc_exceptions
     @log_execution_time
@@ -76,10 +79,11 @@ class NoteServiceServicer(note_pb2_grpc.NoteServiceServicer):
         logger = self.logger.bind(request_id=request_id, endpoint="ListNotes")
         logger.debug(f"Entering ListNotes with skip={request.skip}, limit={request.limit}")
 
-        dto = NoteListDTO(skip=request.skip, limit=request.limit)
-        result = await self.service.list(dto, user_id, role, request_id)
+        grpc_dto = proto_to_grpc_list_dto(request)
+        service_dto = grpc_to_service_list_dto(grpc_dto)
+        result = await self.service.list(service_dto, user_id, role, request_id)
         logger.info("Notes listed successfully")
-        return note_pb2.ListNotesResponse(notes=[map_to_note_response(note) for note in result.notes])
+        return grpc_to_proto_list_response(service_to_grpc_list_response_dto(result))
 
     @async_handle_grpc_exceptions
     @log_execution_time
@@ -88,10 +92,11 @@ class NoteServiceServicer(note_pb2_grpc.NoteServiceServicer):
         logger = self.logger.bind(request_id=request_id, endpoint="UpdateNote")
         logger.debug(f"Entering UpdateNote with entity_id={request.entity_id}")
 
-        dto = NoteUpdateDTO(entity_id=UUID(request.entity_id), title=request.title, content=request.content)
-        result = await self.service.update(dto, user_id, role, request_id)
+        grpc_dto = proto_to_grpc_update_dto(request)
+        service_dto = grpc_to_service_update_dto(grpc_dto)
+        result = await self.service.update(service_dto, user_id, role, request_id)
         logger.info("Note updated successfully")
-        return map_to_note_response(result)
+        return grpc_to_proto_response(service_to_grpc_response_dto(result))
 
     @async_handle_grpc_exceptions
     @log_execution_time
@@ -100,7 +105,8 @@ class NoteServiceServicer(note_pb2_grpc.NoteServiceServicer):
         logger = self.logger.bind(request_id=request_id, endpoint="DeleteNote")
         logger.debug(f"Entering DeleteNote with entity_id={request.entity_id}")
 
-        dto = NoteDeleteDTO(entity_id=UUID(request.entity_id))
-        await self.service.delete(dto, user_id, role, request_id)
+        grpc_dto = proto_to_grpc_delete_dto(request)
+        service_dto = grpc_to_service_delete_dto(grpc_dto)
+        await self.service.delete(service_dto, user_id, role, request_id)
         logger.info("Note deleted successfully")
         return note_pb2.DeleteNoteResponse()

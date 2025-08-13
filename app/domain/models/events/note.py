@@ -5,5 +5,15 @@ from pydantic import BaseModel
 class NoteCreatedEvent(BaseModel):
     id: UUID
     title: str
-    owner_id: UUID  # Изменено на owner_id
+    owner_id: UUID
     created_at: datetime
+
+class NoteUpdatedEvent(BaseModel):
+    id: UUID
+    title: str
+    owner_id: UUID
+    updated_at: datetime
+
+class NoteDeletedEvent(BaseModel):
+    id: UUID
+    owner_id: UUID

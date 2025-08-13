@@ -4,7 +4,6 @@ from domain.ports.outbound.logger.logger_port import LoggerPort
 import json
 import asyncio
 
-
 async def start_consumer(uri: str, handler: EventHandlerPort, logger: LoggerPort):
     logger = logger.bind(component="RabbitMQConsumer")
     connection = None
@@ -12,7 +11,7 @@ async def start_consumer(uri: str, handler: EventHandlerPort, logger: LoggerPort
         connection = await connect_robust(uri)
         channel = await connection.channel()
         exchange = await channel.declare_exchange("events", ExchangeType.TOPIC, durable=True)
-        queue = await channel.declare_queue("note_queue", durable=True)  # Use named, durable queue
+        queue = await channel.declare_queue("note_queue", durable=True)
         await queue.bind(exchange, routing_key="note.*")
 
         async def on_message(message: IncomingMessage):
@@ -21,8 +20,10 @@ async def start_consumer(uri: str, handler: EventHandlerPort, logger: LoggerPort
                     payload = json.loads(message.body)
                     logger.info("Event received", routing_key=message.routing_key, payload=payload)
                     await handler.handle_event(message.routing_key, payload)
+                except json.JSONDecodeError as e:
+                    logger.error("Invalid JSON payload", error=str(e), routing_key=message.routing_key)
                 except Exception as e:
-                    logger.exception("Failed to process message", error=str(e))
+                    logger.exception("Failed to process message", error=str(e), routing_key=message.routing_key)
 
         await queue.consume(on_message)
         logger.info("RabbitMQ consumer started successfully")
